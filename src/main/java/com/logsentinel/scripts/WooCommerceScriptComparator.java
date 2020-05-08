@@ -80,7 +80,7 @@ public class WooCommerceScriptComparator {
                             }
                             String siteScript = normalize(IOUtils.toString(new URL(url + WOOCOMMERCE_PREFIX + scriptName), 
                                     StandardCharsets.UTF_8));
-                            if (StringUtils.isBlank(siteScript) || siteScript.contains("<body>") || siteScript.contains("<html>")) {
+                            if (StringUtils.isBlank(siteScript) || siteScript.contains("</body>") || siteScript.contains("</html>")) {
                                 continue;
                             }
                             
