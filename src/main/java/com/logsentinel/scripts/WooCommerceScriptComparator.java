@@ -3,6 +3,7 @@ package com.logsentinel.scripts;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.ConnectException;
@@ -20,11 +21,12 @@ import javax.net.ssl.SSLHandshakeException;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
-public class ScriptComparator {
+public class WooCommerceScriptComparator {
 
     private static String META_VERSION_PREFIX = "<meta name=\"generator\" content=\"WooCommerce ";
 
@@ -37,6 +39,7 @@ public class ScriptComparator {
     public static void main(String[] args) throws Exception {
         
         System.setProperty("http.agent", "scriptinel.com");
+        String outPath = args.length > 1 ? args[1] : System.getProperty("java.io.tmpdir") + "/wocommerce.csv";
         
         List<String> scripts = Arrays.asList("/assets/js/jquery-payment/jquery.payment.js", "/assets/js/frontend/woocommerce.js", 
                 "/assets/js/frontend/checkout.js", "/assets/js/frontend/cart.js",
@@ -44,7 +47,8 @@ public class ScriptComparator {
 
         int problematicHosts = 0;
         try (CSVParser parser = CSVFormat.DEFAULT.withSkipHeaderRecord().parse(
-                new InputStreamReader(new FileInputStream(new File(args[0])), StandardCharsets.UTF_8))) {
+                new InputStreamReader(new FileInputStream(new File(args[0])), StandardCharsets.UTF_8));
+                CSVPrinter out = new CSVPrinter(new FileWriter(outPath, true), CSVFormat.DEFAULT)) {
             for (CSVRecord record : parser) {
                 String url = record.get(0);
                 try {
@@ -76,9 +80,13 @@ public class ScriptComparator {
                             }
                             String siteScript = normalize(IOUtils.toString(new URL(url + WOOCOMMERCE_PREFIX + scriptName), 
                                     StandardCharsets.UTF_8));
+                            if (StringUtils.isBlank(siteScript) || siteScript.contains("<body>") || siteScript.contains("<html>")) {
+                                continue;
+                            }
+                            
                             String siteHash = DigestUtils.sha1Hex(siteScript);
                             
-                            if (StringUtils.isNotBlank(siteScript) && hash != null && !siteHash.equals(hash)) {
+                            if (hash != null && !siteHash.equals(hash)) {
                                 // check if the min.js is not actually expanded
                                 if (scriptName.endsWith(".min.js")) {
                                     siteScript = normalize(IOUtils.toString(new URL(url + WOOCOMMERCE_PREFIX + scriptName.replace(".min.js", ".js")), 
@@ -90,7 +98,12 @@ public class ScriptComparator {
                                 System.out.println(normalize(IOUtils.toString(new URL(scriptUrl), StandardCharsets.UTF_8)));
                                 System.out.println(siteScript);
                                 System.out.println(url + WOOCOMMERCE_PREFIX + scriptName + " mismatch");
+                                
+                                out.printRecord(url + WOOCOMMERCE_PREFIX + scriptName, "mismatch");
+                            } else {
+                                out.printRecord(url + WOOCOMMERCE_PREFIX + scriptName, "ok");
                             }
+                            out.flush();
                         }
                     }
                     
