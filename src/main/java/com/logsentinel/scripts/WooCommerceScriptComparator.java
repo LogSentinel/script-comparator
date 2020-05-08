@@ -28,6 +28,8 @@ import org.apache.commons.lang3.StringUtils;
 
 public class WooCommerceScriptComparator {
 
+    private static final int LENGTH_DIFF_THRESHOLD = 10;
+
     private static String META_VERSION_PREFIX = "<meta name=\"generator\" content=\"WooCommerce ";
 
     private static String WOOCOMMERCE_PREFIX = "wp-content/plugins/woocommerce";
@@ -35,6 +37,7 @@ public class WooCommerceScriptComparator {
     private static String GITHUB_ROOT = "https://raw.githubusercontent.com/woocommerce/woocommerce/";
     
     private static Map<String, String> hashes = new HashMap<>();
+    private static Map<String, Integer> lengths = new HashMap<>();
     
     public static void main(String[] args) throws Exception {
         
@@ -69,10 +72,11 @@ public class WooCommerceScriptComparator {
                             String hash = hashes.get(version + scriptName); 
                             if (hash == null) {
                                 try {
-                                    String text = normalize(IOUtils.toString(new URL(scriptUrl), StandardCharsets.UTF_8));
-                                    if (StringUtils.isNotBlank(text)) {
-                                        hash = DigestUtils.sha1Hex(text);
-                                        hashes.put(version, hash);
+                                    String githubScript = normalize(IOUtils.toString(new URL(scriptUrl), StandardCharsets.UTF_8));
+                                    if (StringUtils.isNotBlank(githubScript)) {
+                                        hash = DigestUtils.sha1Hex(githubScript);
+                                        hashes.put(version + scriptName, hash);
+                                        lengths.put(version + scriptName, githubScript.length());
                                     }
                                 } catch (Exception ex) {
                                     ex.printStackTrace();
@@ -92,9 +96,16 @@ public class WooCommerceScriptComparator {
                                     siteScript = normalize(IOUtils.toString(new URL(url + WOOCOMMERCE_PREFIX + scriptName.replace(".min.js", ".js")), 
                                             StandardCharsets.UTF_8));
                                     if (DigestUtils.sha1Hex(siteScript).equals(hashes.get(version + scriptName.replace(".min.js", ".js")))) {
+                                        out.printRecord(url + WOOCOMMERCE_PREFIX + scriptName, "ok");
                                         continue;
                                     }
                                 }
+                                
+                                if (Math.abs(siteScript.length() - lengths.get(version + scriptName)) < LENGTH_DIFF_THRESHOLD) {
+                                    out.printRecord(url + WOOCOMMERCE_PREFIX + scriptName, "ok");
+                                    continue;
+                                }
+                                
                                 System.out.println(normalize(IOUtils.toString(new URL(scriptUrl), StandardCharsets.UTF_8)));
                                 System.out.println(siteScript);
                                 System.out.println(url + WOOCOMMERCE_PREFIX + scriptName + " mismatch");
